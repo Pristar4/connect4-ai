@@ -1,4 +1,5 @@
 import random
+import time
 
 
 class Connect4Env:
@@ -9,6 +10,10 @@ class Connect4Env:
         # Todo: more efficient to store a board as value type
         self.current_player = 1  # Player 1 starts
         self.moves_stack = []
+
+    def get_state_repr(self):
+        # Flatten the 2D list and convert it to a string
+        return ''.join(str(item) for sublist in self.board for item in sublist)
 
     def simulate_move(self, column, player):
         """Simulates a move without changing the current player"""
@@ -82,6 +87,7 @@ class Connect4Env:
                 if (self.board[j][i] == self.board[j + 1][i - 1] ==
                         self.board[j + 2][i - 2] == self.board[j + 3][i - 3] == player):
                     return True
+        return False
 
     def is_winner(self, player):
         # Check if the specified player has won
@@ -117,13 +123,20 @@ class Connect4Env:
 
 
 class MinMaxPlayer:
-    def __init__(self, ply):
+    def __init__(self, ply, time_limit):
         self.ply = ply
         self.depth = ply / 2
         self.max_depth = ply / 2
+        self.time_limit = time_limit
+
+        # Profiling properties
+        self.counter = 0
+        self.start_time = 0
+        self.end_time = 0
 
     def score(self, board, player, depth):
         normalized_ply = depth / self.max_depth
+
         if board.is_winner(player):
             return 1 + normalized_ply / 2
         elif board.is_winner(1 if player == 2 else 2):
@@ -131,25 +144,52 @@ class MinMaxPlayer:
         else:
             return 0
 
-    def choose_move(self, env):
-        # Initial call to the Minimax function
-        best_score = float('-inf')
-        valid_moves = env.get_valid_moves()
-        # randomize the order of the moves
+    def order_moves(self, valid_moves):
+        # weighted_moves = [(abs(move - 3), move) for move in valid_moves]
+        # weighted_moves.sort()
+        # return [move for _, move in weighted_moves]
         # random.shuffle(valid_moves)
+        return valid_moves
+
+    def choose_move(self, env):
+        self.counter = 0
+        self.pruned = 0  # reset the counters
+        self.start_time = time.time()  # get the start time
         best_move = None
-        for move in valid_moves:
-            env.simulate_move(move, 2)
-            score = self.minimax(env, self.ply - 1, float('-inf'), float('inf'),
-                                 False)  # We are maximizing
-            env.undo_move(move)
-            print(f"move: {move}, score: {score}")  # To observe the move and score
-            if score > best_score:
-                best_score = score
-                best_move = move
+        best_score = float('-inf')
+
+        for depth in range(1, self.ply + 1):
+            valid_moves = self.order_moves(env.get_valid_moves())
+            for move in valid_moves:
+                # if time.time() - self.start_time > self.time_limit:
+                #     # return immediately if time limit exceeded
+                #     print("Time limit exceeded ")
+                #     print(f"Depth: {depth}, Best move: {best_move}, Best score: {best_score}")
+                #     self.time_limit = 5
+                #     return best_move
+
+                env.simulate_move(move, 2)
+                score = self.minimax(env, depth - 1, float('-inf'), float('inf'), False)  # We are maximizing
+                env.undo_move(move)
+                if score > best_score:
+                    best_score = score
+                    best_move = move
+                print(f"move: {move}, score: {score}")  # To observe the move and score
+                print(f"BEST MOVE: {best_move}, BEST SCORE: {best_score}")
+
+            print(f"Depth: {depth}, Best move: {best_move}, Best score: {best_score}")
+
+        self.end_time = time.time()  # get the end time
+        time_taken = self.end_time - self.start_time  # calculate the time taken
+        print("Total nodes searched: ", self.counter)
+        print("Total nodes pruned: ", self.pruned)
+        print("Pruning percentage: ", self.pruned / self.counter * 100)
+        print("Nodes searched per second: ", self.counter / time_taken)  # calculate nodes per second
+
         return best_move
 
     def minimax(self, env, depth, alpha, beta, maximizingPlayer):
+        self.counter += 1
         if env.current_player == 1:
             score = self.score(env, 1, depth)
         else:
@@ -157,15 +197,17 @@ class MinMaxPlayer:
         if depth == 0 or env.is_winner(1) or env.is_winner(2) or env.is_draw():
             return score
 
-        valid_moves = env.get_valid_moves()
+        valid_moves = self.order_moves(env.get_valid_moves())
         if maximizingPlayer:
             value = float('-inf')
             for move in valid_moves:
                 env.simulate_move(move, 2)
-                value = max(value, self.minimax(env, depth - 1, alpha, beta, False))
+                value = max(value, self.minimax(env, depth - 1, alpha, beta, not maximizingPlayer))
                 env.undo_move(move)
                 alpha = max(alpha, value)
                 if alpha >= beta:
+                    self.pruned += 1
+                    # increment the pruned counter
                     break
             return value
         else:  # Minimizing player
@@ -176,6 +218,7 @@ class MinMaxPlayer:
                 env.undo_move(move)
                 beta = min(beta, value)
                 if beta <= alpha:
+                    self.pruned += 1
                     break
             return value
 
@@ -193,8 +236,8 @@ if __name__ == '__main__':
         except AssertionError:
             print("Difficulty should be a number between 1 and 10.")
 
-    player1 = MinMaxPlayer(2)
-    player2 = MinMaxPlayer(difficulty)
+    player1 = MinMaxPlayer(difficulty, 5)
+    player2 = MinMaxPlayer(difficulty, 5)
     # game loop
     env.print_board()
     while not env.is_draw():
