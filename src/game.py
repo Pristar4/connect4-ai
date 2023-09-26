@@ -6,6 +6,7 @@ class Connect4Env:
     def __init__(self, board=None, current_player=1):
         # Initialize the game board (usually a 6x7 grid)
         self.board = [[0] * 7 for _ in range(6)]
+        # Todo: more efficient to store a board as value type
         self.current_player = 1  # Player 1 starts
         self.moves_stack = []
 
@@ -33,14 +34,6 @@ class Connect4Env:
                 self.moves_stack.pop()
                 break
         return True
-
-    def score(self, player, depth):
-        if self.is_winner(player):
-            return 10 - depth
-        elif self.is_winner(1 if player == 2 else 2):
-            return depth - 10
-        else:
-            return 0
 
     def make_move(self, column):
         # Implement making a move in the specified column for the current player
@@ -124,19 +117,31 @@ class Connect4Env:
 
 
 class MinMaxPlayer:
-    def __init__(self, depth):
-        self.depth = depth
+    def __init__(self, ply):
+        self.ply = ply
+        self.depth = ply / 2
+        self.max_depth = ply / 2
+
+    def score(self, board, player, depth):
+        normalized_ply = depth / self.max_depth
+        if board.is_winner(player):
+            return 1 + normalized_ply / 2
+        elif board.is_winner(1 if player == 2 else 2):
+            return -1 - normalized_ply / 2
+        else:
+            return 0
 
     def choose_move(self, env):
         # Initial call to the Minimax function
         best_score = float('-inf')
         valid_moves = env.get_valid_moves()
         # randomize the order of the moves
-        random.shuffle(valid_moves)
+        # random.shuffle(valid_moves)
         best_move = None
         for move in valid_moves:
             env.simulate_move(move, 2)
-            score = self.minimax(env, self.depth - 1, float('-inf'), float('inf'), False)  # We are maximizing
+            score = self.minimax(env, self.ply - 1, float('-inf'), float('inf'),
+                                 False)  # We are maximizing
             env.undo_move(move)
             print(f"move: {move}, score: {score}")  # To observe the move and score
             if score > best_score:
@@ -146,12 +151,11 @@ class MinMaxPlayer:
 
     def minimax(self, env, depth, alpha, beta, maximizingPlayer):
         if env.current_player == 1:
-            score = env.score(1, depth)
+            score = self.score(env, 1, depth)
         else:
-            score = env.score(2, depth)
+            score = self.score(env, 2, depth)
         if depth == 0 or env.is_winner(1) or env.is_winner(2) or env.is_draw():
             return score
-
 
         valid_moves = env.get_valid_moves()
         if maximizingPlayer:
@@ -200,8 +204,8 @@ if __name__ == '__main__':
             print(f"valid moves: {env.get_valid_moves()}")
             while True:
                 try:
-                    # move = int(input("Enter a move: ")) - 1
-                    move = player1.choose_move(env)
+                    move = int(input("Enter a move: ")) - 1
+                    # move = player1.choose_move(env)
                     assert move in env.get_valid_moves()
                     break
                 except ValueError:
@@ -221,4 +225,4 @@ if __name__ == '__main__':
             print("Player 2 wins!")
             break
         # wait for space to be pressed
-        input("Press Enter to continue...")
+        # input("Press Enter to continue...")
