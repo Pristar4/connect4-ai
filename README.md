@@ -234,6 +234,10 @@ Project Link: [https://github.com/Pristar4/connect4-ai](https://github.com/Prist
 
 [license-url]: https://github.com/Pristar4/connect4-ai/blob/master/LICENSE.txt
 
+[license-shield]: https://img.shields.io/github/license/Pristar4/SnakeGame.svg?style=for-the-badge
+
+[license-url]: https://github.com/Pristar4/SnakeGame/blob/master/LICENSE.txt
+
 [//]: # ([linkedin-shield]: https://img.shields.io/badge/-LinkedIn-black.svg?style=for-the-badge&logo=linkedin&colorB=555)
 
 [//]: # ()
