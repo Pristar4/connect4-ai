@@ -1,5 +1,9 @@
+import random
+
+
 class Connect4Env:
-    def __init__(self):
+
+    def __init__(self, board=None, current_player=1):
         # Initialize the game board (usually a 6x7 grid)
         self.board = [[0] * 7 for _ in range(6)]
         self.current_player = 1  # Player 1 starts
@@ -18,27 +22,23 @@ class Connect4Env:
                 break
         return True
 
-    def undo_move(self, move):
+    def undo_move(self, _move):
         """Undoes the last move made"""
         if not self.moves_stack:
             print("No moves to undo")
             return False
         for row in self.board:
-            if row[move] != 0:
-                row[move] = 0
+            if row[_move] != 0:
+                row[_move] = 0
                 self.moves_stack.pop()
                 break
         return True
 
-    def score(self, player):
-        # This is a very simplistic scoring function
-        # A better scoring function would consider multiple factors such as the quantity
-        #  and organization of chips.
-        # return 1 if player wins return -1 if opponent wins and 0 otherwise
+    def score(self, player, depth):
         if self.is_winner(player):
-            return 1
-        elif self.is_winner(3 - player):
-            return -1
+            return 10 - depth
+        elif self.is_winner(1 if player == 2 else 2):
+            return depth - 10
         else:
             return 0
 
@@ -61,7 +61,6 @@ class Connect4Env:
         for row in self.board:
             if row[column] == 0:
                 return True
-        print(f" column {column} is full")
         return False
 
     def _is_horizontal_winner(self, player):
@@ -84,6 +83,11 @@ class Connect4Env:
             for j in range(3):
                 if (self.board[j][i] == self.board[j + 1][i + 1] ==
                         self.board[j + 2][i + 2] == self.board[j + 3][i + 3] == player):
+                    return True
+        for i in range(3, 7):
+            for j in range(3):
+                if (self.board[j][i] == self.board[j + 1][i - 1] ==
+                        self.board[j + 2][i - 2] == self.board[j + 3][i - 3] == player):
                     return True
 
     def is_winner(self, player):
@@ -126,8 +130,11 @@ class MinMaxPlayer:
     def choose_move(self, env):
         # Initial call to the Minimax function
         best_score = float('-inf')
+        valid_moves = env.get_valid_moves()
+        # randomize the order of the moves
+        random.shuffle(valid_moves)
         best_move = None
-        for move in env.get_valid_moves():
+        for move in valid_moves:
             env.simulate_move(move, 2)
             score = self.minimax(env, self.depth - 1, float('-inf'), float('inf'), False)  # We are maximizing
             env.undo_move(move)
@@ -138,8 +145,13 @@ class MinMaxPlayer:
         return best_move
 
     def minimax(self, env, depth, alpha, beta, maximizingPlayer):
+        if env.current_player == 1:
+            score = env.score(1, depth)
+        else:
+            score = env.score(2, depth)
         if depth == 0 or env.is_winner(1) or env.is_winner(2) or env.is_draw():
-            return env.score(2)  # Assuming player 2 is our AI
+            return score
+
 
         valid_moves = env.get_valid_moves()
         if maximizingPlayer:
@@ -167,23 +179,46 @@ class MinMaxPlayer:
 # Main application
 if __name__ == '__main__':
     env = Connect4Env()
-    player2 = MinMaxPlayer(1)
+    while True:
+        try:
+            difficulty = int(input("Enter difficulty (1-10): "))
+            assert 1 <= difficulty <= 10
+            break
+        except ValueError:
+            print("Invalid Difficulty. Please Enter a number between 1 and 10.")
+        except AssertionError:
+            print("Difficulty should be a number between 1 and 10.")
+
+    player1 = MinMaxPlayer(2)
+    player2 = MinMaxPlayer(difficulty)
     # game loop
+    env.print_board()
     while not env.is_draw():
-        env.print_board()
 
         if env.current_player == 1:
+            print(f"Current player: {env.current_player}")
             print(f"valid moves: {env.get_valid_moves()}")
-            move = int(input("Enter a move: ")) - 1
+            while True:
+                try:
+                    # move = int(input("Enter a move: ")) - 1
+                    move = player1.choose_move(env)
+                    assert move in env.get_valid_moves()
+                    break
+                except ValueError:
+                    print("Invalid move. Please Enter a valid number.")
+                except AssertionError:
+                    print("Move is not valid. Choose a move from the list of valid moves.")
         else:  # Player 2
+            print(f"Current player: {env.current_player}")
             move = player2.choose_move(env)
         env.make_move(move)
+        env.print_board()
         if env.is_winner(1):
             print("Player 1 wins!")
-            env.print_board()
             break
         elif env.is_winner(2):
 
             print("Player 2 wins!")
-            env.print_board()
             break
+        # wait for space to be pressed
+        input("Press Enter to continue...")
