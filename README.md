@@ -255,7 +255,7 @@ Project Link: [https://github.com/Pristar4/connect4-ai](https://github.com/Prist
 
 [product-screenshot]: images/screenshot.png
 
-[Python.com]: https://img.shields.io/badge/unity-black?style=for-the-badge&logo=python
+[Python.com]: https://img.shields.io/badge/python-black?style=for-the-badge&logo=python
 
 [Python-url]: https://python.org/
 
