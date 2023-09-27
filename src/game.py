@@ -126,8 +126,11 @@ class MinMaxPlayer:
     def __init__(self, ply, time_limit):
         self.ply = ply
         self.depth = ply / 2
-        self.max_depth = ply / 2
+        self.max_depth = 42
+        self.reached_depth = 1
         self.time_limit = time_limit
+        # Initialize a move scores dictionary
+        self.move_scores = {}
 
         # Profiling properties
         self.counter = 0
@@ -135,7 +138,7 @@ class MinMaxPlayer:
         self.end_time = 0
 
     def score(self, board, player, depth):
-        normalized_ply = depth / self.max_depth
+        normalized_ply = depth / self.reached_depth  # Normalize with reached depth
 
         if board.is_winner(player):
             return 1 + normalized_ply / 2
@@ -144,11 +147,10 @@ class MinMaxPlayer:
         else:
             return 0
 
-    def order_moves(self, valid_moves):
-        # weighted_moves = [(abs(move - 3), move) for move in valid_moves]
-        # weighted_moves.sort()
-        # return [move for _, move in weighted_moves]
-        # random.shuffle(valid_moves)
+    def order_moves(self, valid_moves, depth):
+        random.shuffle(valid_moves)
+        if depth - 1 in self.move_scores:
+            return sorted(valid_moves, key=lambda move: self.move_scores[depth - 1].get(move, 0), reverse=True)
         return valid_moves
 
     def choose_move(self, env):
@@ -156,26 +158,31 @@ class MinMaxPlayer:
         self.pruned = 0  # reset the counters
         self.start_time = time.time()  # get the start time
         best_move = None
-        best_score = float('-inf')
 
-        for depth in range(1, self.ply + 1):
-            valid_moves = self.order_moves(env.get_valid_moves())
+        for depth in range(1, self.max_depth + 1):  # Iterate up to the unreachable max_depth
+            best_score = float('-inf')
+            if depth not in self.move_scores:
+                self.move_scores[depth] = {}
+
+            valid_moves = self.order_moves(env.get_valid_moves(), depth)
             for move in valid_moves:
-                # if time.time() - self.start_time > self.time_limit:
-                #     # return immediately if time limit exceeded
-                #     print("Time limit exceeded ")
-                #     print(f"Depth: {depth}, Best move: {best_move}, Best score: {best_score}")
-                #     self.time_limit = 5
-                #     return best_move
+                if time.time() - self.start_time > self.time_limit * 0.95:  # Check if 95% of the time limit has been reached
+                    self.reached_depth = depth - 1  # Update the maximum reached depth to the currently finished depth
+                    print("Time limit nearly reached, reverting to last completed depth")
+                    print(f"Depth: {self.reached_depth}, Best move: {best_prev_move}, Best score: {best_prev_score}")
+                    return best_prev_move
 
                 env.simulate_move(move, 2)
                 score = self.minimax(env, depth - 1, float('-inf'), float('inf'), False)  # We are maximizing
                 env.undo_move(move)
+                # Store the move score at the current depth
+                self.move_scores[depth][move] = score
                 if score > best_score:
                     best_score = score
                     best_move = move
+                    best_prev_score = best_score
+                    best_prev_move = best_move
                 print(f"move: {move}, score: {score}")  # To observe the move and score
-                print(f"BEST MOVE: {best_move}, BEST SCORE: {best_score}")
 
             print(f"Depth: {depth}, Best move: {best_move}, Best score: {best_score}")
 
@@ -189,20 +196,18 @@ class MinMaxPlayer:
         return best_move
 
     def minimax(self, env, depth, alpha, beta, maximizingPlayer):
+        score_win_player = self.score(env, env.current_player, depth)
         self.counter += 1
-        if env.current_player == 1:
-            score = self.score(env, 1, depth)
-        else:
-            score = self.score(env, 2, depth)
-        if depth == 0 or env.is_winner(1) or env.is_winner(2) or env.is_draw():
-            return score
+        if (depth == 0 or env.is_winner(1) or env.is_winner(2) or env.is_draw() or
+                score_win_player >= 1 or score_win_player <= -1):
+            return self.score(env, env.current_player, depth)
 
-        valid_moves = self.order_moves(env.get_valid_moves())
+        valid_moves = self.order_moves(env.get_valid_moves(), depth)
         if maximizingPlayer:
             value = float('-inf')
             for move in valid_moves:
                 env.simulate_move(move, 2)
-                value = max(value, self.minimax(env, depth - 1, alpha, beta, not maximizingPlayer))
+                value = max(value, self.minimax(env, depth - 1, alpha, beta, False))
                 env.undo_move(move)
                 alpha = max(alpha, value)
                 if alpha >= beta:
@@ -223,28 +228,42 @@ class MinMaxPlayer:
             return value
 
 
+class MinMaxPlayerImproved(MinMaxPlayer):
+    def __init__(self, ply, time_limit):
+        super().__init__(ply, time_limit)
+
+    def score(self, board, player, depth):
+        normalized_ply = (21 - depth)
+
+        if board.is_winner(player):
+            return 1 + normalized_ply  # Award max score of 2 down to min score of 1
+        elif board.is_winner(3 - player):
+            return -1 - normalized_ply  # Punish by max score of -2 up to min score of -1
+        else:
+            return 0  # No advantage no punishment
+
+
 # Main application
 if __name__ == '__main__':
     env = Connect4Env()
     while True:
         try:
-            difficulty = int(input("Enter difficulty (1-10): "))
-            assert 1 <= difficulty <= 10
+            difficulty = int(input("Enter difficulty (1-50): "))
+            assert 1 <= difficulty <= 50
             break
         except ValueError:
             print("Invalid Difficulty. Please Enter a number between 1 and 10.")
         except AssertionError:
             print("Difficulty should be a number between 1 and 10.")
 
-    player1 = MinMaxPlayer(difficulty, 5)
-    player2 = MinMaxPlayer(difficulty, 5)
+    player1 = MinMaxPlayer(difficulty, 20)
+    player2 = MinMaxPlayerImproved(difficulty, 20)
     # game loop
     env.print_board()
     while not env.is_draw():
 
         if env.current_player == 1:
             print(f"Current player: {env.current_player}")
-            print(f"valid moves: {env.get_valid_moves()}")
             while True:
                 try:
                     move = int(input("Enter a move: ")) - 1
