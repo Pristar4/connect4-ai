@@ -148,7 +148,16 @@ Perform the following steps to set up and run the project:
 
 ## Roadmap
 
-- [ ] Min-Max algorithm
+- [X] Min-Max algorithm
+    - [X] Alpha-Beta pruning
+    - [X] Move exploration order
+    - [ ] Bitboard
+    - [ ] Transposition table
+    - [X] Iterative deepening (somewhat)
+    - [ ] Anticipate losing moves
+    - [ ] Better move ordering
+    - [ ] Optimized transposition table
+    - [ ] Lower bound transposition table
 - [ ] Node System
 - [ ] MCTS approach
 - [ ] self learning / machine learning
