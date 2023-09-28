@@ -1,13 +1,13 @@
 from unittest import TestCase
 
-from src.game import Connect4Env, MinMaxPlayer
+from src.game import Board, MinMaxPlayer
 
 
 class TestMinMaxPlayerImproved(TestCase):
 
     def test_score(self):
         # Create a simple board configuration
-        board = Connect4Env()
+        board = Board()
         player = MinMaxPlayer(8, 10)
         for idx, row in enumerate(board.board):
             # Leave even rows empty and place player 2's pieces on odd rows
@@ -19,7 +19,7 @@ class TestMinMaxPlayerImproved(TestCase):
         assert score > 0, f"Expected > 0 but got {score}"
 
         # Create another board configuration
-        board = Connect4Env()
+        board = Board()
         for idx, row in enumerate(board.board):
             # Leave even rows empty and place player 2's pieces on odd columns
             for col in range(7):
@@ -31,7 +31,7 @@ class TestMinMaxPlayerImproved(TestCase):
         assert score > 0, f"Expected > 0 but got {score}"
 
         # Create another board configuration, with no connected cells
-        board = Connect4Env()
+        board = Board()
         for idx, row in enumerate(board.board):
             if idx < 3:
                 row[idx] = 2
