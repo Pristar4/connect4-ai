@@ -343,9 +343,6 @@ class MinMaxPlayer:
             return min_score
 
 
-
-
-
 # Main application
 if __name__ == '__main__':
     board = Board()
