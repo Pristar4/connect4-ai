@@ -1,161 +1,6 @@
-import copy
 import time
-import random
 
-BOARD_WIDTH = 7
-BOARD_HEIGHT = 6
-PLAYER_1 = 1
-PLAYER_2 = 2
-
-
-class Node:
-    def __init__(self, state, parent=None):
-        self.state = state
-        self.children = []
-        self.move = None
-        self.parent = parent
-        self.value = None
-
-
-class Board:
-
-    def __init__(self, board=None, current_player=1, move_counter={PLAYER_1: 0, PLAYER_2: 0}):
-        # Initialize the game board (usually a 6x7 grid)
-        self.board = [[0] * BOARD_WIDTH for _ in range(BOARD_HEIGHT)]
-
-        # Todo: more efficient to store a board as value type
-        self.current_player = PLAYER_1  # Player 1 starts
-        self.move_history = []
-        self.move_counter = {PLAYER_1: 0, PLAYER_2: 0}
-
-    def reset(self):
-        self.board = [[0] * BOARD_WIDTH for _ in range(BOARD_HEIGHT)]
-        self.current_player = PLAYER_1  # Player 1 starts
-        self.move_history = []
-        self.move_counter = {PLAYER_1: 0, PLAYER_2: 0}
-
-    def create_children(self, node):
-        valid_moves = node.get_valid_moves(node.state)
-        for move in valid_moves:
-            new_state = copy.deepcopy(node.state)
-            self.make_move(new_state, move)
-            child_node = Node(new_state, parent=node)
-            child_node.move = move
-            node.children.append(child_node)
-
-    def simulate_move(self, column, player):
-        if not self.is_valid_move(column):
-            print(f"invalid move: {column}")
-            return False
-
-        for row in reversed(self.board):
-            if row[column] == 0:
-                row[column] = player
-                self.move_history.append(column + 1)
-                # add the move to the stack
-                break
-        return True
-
-    def undo_move(self, _move):
-        if not self.move_history:
-            print("No moves to undo")
-            return False
-
-        for row in self.board:
-            if row[_move] != 0:
-                row[_move] = 0
-                self.move_history.pop()
-                break
-        return True
-
-    def make_move(self, column):
-        valid_moves = self.get_valid_moves()
-        if column not in valid_moves:
-            print(f"invalid move: {column}")
-            return False
-
-        for row in reversed(self.board):
-            if row[column] == 0:
-                row[column] = self.current_player
-                break
-        self.move_counter[self.current_player] += 1
-        print(f"Move counter: {self.move_counter}")
-        self.switch_player()
-        return True
-
-    def switch_player(self):
-        self.current_player = PLAYER_1 if self.current_player == PLAYER_2 else PLAYER_2
-
-    def is_valid_move(self, column):
-        return 0 <= column < BOARD_WIDTH and any(row[column] == 0 for row in self.board)
-
-    def _is_horizontal_winner(self, player):
-        # Check horizontal
-        for row in self.board:
-            for i in range(BOARD_WIDTH - 3):
-                if row[i] == row[i + 1] == row[i + 2] == row[i + 3] == player:
-                    return True
-
-    def _is_vertical_winner(self, player):
-        # Check vertical
-        for i in range(BOARD_WIDTH):
-            for j in range(BOARD_HEIGHT - 3):
-                if self.board[j][i] == self.board[j + 1][i] == self.board[j + 2][i] == self.board[j + 3][i] == player:
-                    return True
-
-    def _is_diagonal_winner(self, player):
-        # Check diagonal
-        for i in range(BOARD_WIDTH - 3):
-            for j in range(BOARD_HEIGHT - 3):
-                if (self.board[j][i] == self.board[j + 1][i + 1] ==
-                        self.board[j + 2][i + 2] == self.board[j + 3][i + 3] == player):
-                    return True
-        for i in range(BOARD_HEIGHT - 3, BOARD_WIDTH):
-            for j in range(BOARD_HEIGHT - 3):
-                if (self.board[j][i] == self.board[j + 1][i - 1] ==
-                        self.board[j + 2][i - 2] == self.board[j + 3][i - 3] == player):
-                    return True
-        return False
-
-    def is_winner(self, player):
-        # Check if the specified player has won
-        if (self._is_vertical_winner(player) or self._is_horizontal_winner(player)
-                or self._is_diagonal_winner(player)):
-            return True
-        return False
-
-    def is_draw(self):
-        # Check if the game is a draw
-        if self.is_winner(PLAYER_1) or self.is_winner(PLAYER_2):
-            return False
-        for row in self.board:
-            for col in row:
-                if col == 0:
-                    return False
-        return True
-
-    def get_valid_moves(self):
-        # Get a list of valid moves for the current player
-        moves = []
-        for i in range(BOARD_WIDTH):
-            if self.is_valid_move(i):
-                moves.append(i)
-
-        return moves
-
-    def print_board(self):
-        print("  ".join([str(i + 1) for i in range(BOARD_WIDTH)]))
-        print("-" * 20)
-        for row in self.board:
-            print("  ".join([str(i) for i in row]))
-
-
-def board_from_moves(moves: str, board: Board) -> None:
-    """Populate the board according to a sequence of moves"""
-    for i, move in enumerate(moves):
-        player = PLAYER_1 if i % 2 == 0 else PLAYER_2  # Switch player after each move
-        board.move_counter[player] += 1
-        board.simulate_move(int(move) - 1, player)  # subtract 1 because columns start from 0
+from src.board import Board, board_from_moves, PLAYER_2, PLAYER_1, BOARD_HEIGHT, BOARD_WIDTH
 
 
 class MinMaxPlayer:
@@ -187,7 +32,6 @@ class MinMaxPlayer:
             # Call the choose_move function which calls minimax internally
             best_move = self.choose_move(board, pruning=True, iterative=True)
             score = self.best_score
-            '2252576253462244111563365343671351441'
 
             time_used = (time.time() - start_time) * 1e6  # Time used in microseconds
             passed = score == expected_score
@@ -210,11 +54,8 @@ class MinMaxPlayer:
         print(
             f"Passed {(passed_count - passed_zero) / (len(benchmarks) - expected_zero) * 100}% of tests without the zeroes.")
 
-
-
     def calculate_score(self, board, player, depth):
         smart_score = False
-
 
         if board.is_winner(player):
             return 22 - board.move_counter[player]
@@ -399,66 +240,3 @@ class MinMaxPlayer:
                 min_score = min(min_score, self.minimax_without_pruning(board, depth - 1))
                 board.undo_move(move)
             return min_score
-
-
-def read_benchmarks_from_file(file_name: str) -> list[tuple[str, int]]:
-    with open(file_name, "r") as file:
-        lines = file.readlines()
-    benchmarks = [(line.split()[0], int(line.split()[1])) for line in lines]
-    return benchmarks
-
-
-# Main application
-if __name__ == '__main__':
-    play_game = False
-
-    board = Board()
-    while True:
-        try:
-            difficulty = int(input("Enter difficulty (1-50): "))
-            assert 1 <= difficulty <= 50
-            break
-        except ValueError:
-            print("Invalid Difficulty. Please Enter a number between 1 and 10.")
-        except AssertionError:
-            print("Difficulty should be a number between 1 and 10.")
-
-    player2 = MinMaxPlayer(difficulty, 8)
-    benchmark_filename = "../benchmark/Test_L3_R1"
-    benchmarks = read_benchmarks_from_file(benchmark_filename)
-    player2.run_benchmarks(benchmarks, board)
-
-    if play_game:
-        # game loop
-        board.print_board()
-        while not board.is_draw():
-
-            if board.current_player == 1:
-                print(f"Current player: {board.current_player}")
-                while True:
-                    try:
-                        move = int(input("Enter a move: ")) - 1
-                        assert move in board.get_valid_moves()
-                        break
-                    except ValueError:
-                        print("Invalid move. Please Enter a valid number.")
-                    except AssertionError:
-                        print("Move is not valid. Choose a move from the list of valid moves.")
-            else:  # Player 2
-                print(f"Current player: {board.current_player}")
-                print("Running full search without pruning...")
-                _ = player2.choose_move(board, pruning=False)
-                print("Running search with iterative deepening...")
-                _ = player2.choose_move(board, pruning=False, iterative=True)
-                print("Running search with pruning...")
-                move = player2.choose_move(board, pruning=True)
-            board.make_move(move)
-            player2.full_search_counter = 0
-            player2.pruned_nodes_count = 0
-
-            board.print_board()
-            if board.is_winner(1):
-                print("Player 1 wins!")
-                break
-            elif board.is_winner(2):
-                print("Player 2 wins!")
