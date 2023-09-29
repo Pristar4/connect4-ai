@@ -22,7 +22,14 @@ class Board:
     def __init__(self, board=None, current_player=1, move_counter={PLAYER_1: 0, PLAYER_2: 0}):
         # Initialize the game board (usually a 6x7 grid)
         self.board = [[0] * BOARD_WIDTH for _ in range(BOARD_HEIGHT)]
+
         # Todo: more efficient to store a board as value type
+        self.current_player = PLAYER_1  # Player 1 starts
+        self.move_history = []
+        self.move_counter = {PLAYER_1: 0, PLAYER_2: 0}
+
+    def reset(self):
+        self.board = [[0] * BOARD_WIDTH for _ in range(BOARD_HEIGHT)]
         self.current_player = PLAYER_1  # Player 1 starts
         self.move_history = []
         self.move_counter = {PLAYER_1: 0, PLAYER_2: 0}
@@ -44,7 +51,7 @@ class Board:
         for row in reversed(self.board):
             if row[column] == 0:
                 row[column] = player
-                self.move_history.append(column)
+                self.move_history.append(column + 1)
                 # add the move to the stack
                 break
         return True
@@ -143,6 +150,14 @@ class Board:
             print("  ".join([str(i) for i in row]))
 
 
+def board_from_moves(moves: str, board: Board) -> None:
+    """Populate the board according to a sequence of moves"""
+    for i, move in enumerate(moves):
+        player = PLAYER_1 if i % 2 == 0 else PLAYER_2  # Switch player after each move
+        board.move_counter[player] += 1
+        board.simulate_move(int(move) - 1, player)  # subtract 1 because columns start from 0
+
+
 class MinMaxPlayer:
     def __init__(self, ply, time_limit):
         self.pruned_nodes_count = 0
@@ -155,32 +170,74 @@ class MinMaxPlayer:
         self.search_counter = 0
         self.start_time = 0
         self.end_time = 0
+        self.best_move = None
+        self.best_score = None
 
         # iterative deepening nodes
         self.nodes_searched = 0
 
+    def run_benchmarks(self, benchmarks: list[tuple[str, int]], board: Board):
+        passed_count = 0
+        expected_zero = 0
+        passed_zero = 0
+        for moves, expected_score in benchmarks:
+            start_time = time.time()  # Start of computation
+            board_from_moves(moves, board)
+
+            # Call the choose_move function which calls minimax internally
+            best_move = self.choose_move(board, pruning=True, iterative=True)
+            score = self.best_score
+            '2252576253462244111563365343671351441'
+
+            time_used = (time.time() - start_time) * 1e6  # Time used in microseconds
+            passed = score == expected_score
+            if expected_score == 0:
+                expected_zero += 1
+            if passed:
+                passed_count += 1
+                if score == 0:
+                    passed_zero += 1
+            else:
+                if expected_score != 0:
+                    print(
+                        f"For moves {moves}, expected {expected_score}, got {score}. Test {'passed' if passed else 'failed'}.")
+            board.reset()
+        print(f"Passed {passed_count} out of {len(benchmarks)} tests.")
+        print(f"Passed {passed_count / len(benchmarks) * 100}% of tests.")
+        print(f"Passed {passed_zero} out of {expected_zero} tests with score 0.")
+        # passed without the zeroes
+        print(f"Passed {passed_count - passed_zero} out of {len(benchmarks) - expected_zero} tests without the zeroes.")
+        print(
+            f"Passed {(passed_count - passed_zero) / (len(benchmarks) - expected_zero) * 100}% of tests without the zeroes.")
+
+
+
     def calculate_score(self, board, player, depth):
+        smart_score = False
+
 
         if board.is_winner(player):
-            return 21 - board.move_counter[player]
-        elif board.is_winner(3 - player):
-            return board.move_counter[player] - 21
+            return 22 - board.move_counter[player]
+        elif board.is_winner(PLAYER_2 if player == PLAYER_1 else PLAYER_1):
+            # return 22 - board.move_counter[PLAYER_2 if player == PLAYER_1 else PLAYER_1]
+            return -22 + board.move_counter[PLAYER_2 if player == PLAYER_1 else PLAYER_1]
         else:
             supplementary_score = 0
-            for i in range(BOARD_HEIGHT):
-                for j in range(BOARD_WIDTH):
-                    if board.board[i][j] == player:
-                        # Check cells horizontally, vertically and diagonally
-                        directions = [(0, 1), (1, 0), (1, 1), (1, -1)]
-                        for dx, dy in directions:
-                            for dist in range(1, 4):
-                                x, y = i + dx * dist, j + dy * dist
-                                if 0 <= x < BOARD_HEIGHT and 0 <= y < BOARD_WIDTH and board.board[x][y] == player:
-                                    # Increase supplementary score if there are other connected pieces to the current player
-                                    supplementary_score += 0.1
-                                else:
-                                    # Stop searching further in this direction if this cell is not a piece of the current player
-                                    break
+            if smart_score:
+                for i in range(BOARD_HEIGHT):
+                    for j in range(BOARD_WIDTH):
+                        if board.board[i][j] == player:
+                            # Check cells horizontally, vertically and diagonally
+                            directions = [(0, 1), (1, 0), (1, 1), (1, -1)]
+                            for dx, dy in directions:
+                                for dist in range(1, 4):
+                                    x, y = i + dx * dist, j + dy * dist
+                                    if 0 <= x < BOARD_HEIGHT and 0 <= y < BOARD_WIDTH and board.board[x][y] == player:
+                                        # Increase supplementary score if there are other connected pieces to the current player
+                                        supplementary_score += 0.1
+                                    else:
+                                        # Stop searching further in this direction if this cell is not a piece of the current player
+                                        break
 
             return supplementary_score  # No advantage no punishment
 
@@ -208,14 +265,14 @@ class MinMaxPlayer:
         self.search_counter = 0
 
         best_move = None
+        best_score = float('-inf')
         if iterative:
             self.search_counter = 0
             self.start_time = time.time()  # get the start time
             self.nodes_searched = 0  # reset nodes_searched for new iterative deepening
-            best_move = None
             for depth in range(1, self.calculation_depth + 1):
                 self.calculation_depth = depth
-                print(f"\nPerforming Minimax search at depth: {depth}")
+                # print(f"\nPerforming Minimax search at depth: {depth}")
                 move = self.choose_move(board, iterative=False, pruning=True)
                 self.nodes_searched += self.search_counter
                 if time.time() - self.start_time > self.time_limit:
@@ -252,15 +309,16 @@ class MinMaxPlayer:
                         if score > best_score:
                             best_score = score
                             best_move = move
+                            self.best_score = score
                             best_prev_score = best_score
                             best_prev_move = best_move
-                        print(f"move: {move}, score: {score.__round__(4)}")  # To observe the move and score
+                        # print(f"move: {move}, score: {score.__round__(4)}")  # To observe the move and score
 
-                    print(f"Depth: {depth}, Best move: {best_move}, Best score: {best_score.__round__(4)}")
+                    # print(f"Depth: {depth}, Best move: {best_move}, Best score: {best_score.__round__(4)}")
 
                 self.end_time = time.time()  # get the end time
                 time_taken = self.end_time - self.start_time  # calculate the time taken
-                self.print_search_statistics(time_taken)
+                # self.print_search_statistics(time_taken)
 
                 return best_move
             else:  # perform a full search
@@ -275,14 +333,14 @@ class MinMaxPlayer:
                     score = self.minimax_without_pruning(board, self.calculation_depth - 1)
                     board.undo_move(move)
 
-                    print(f"move: {move}, score: {score.__round__(4)}")
+                    # print(f"move: {move}, score: {score.__round__(4)}")
 
                     # check if the current move's score is greater than the best_score
                     if score > best_score:
                         best_score = score
                         best_move = move
 
-                print(f"Best move: {best_move}, Best score: {best_score.__round__(4)}")
+                # print(f"Best move: {best_move}, Best score: {best_score.__round__(4)}")
                 return best_move
 
     def minimax(self, board, depth, alpha, beta, maximizingPlayer):
@@ -343,8 +401,17 @@ class MinMaxPlayer:
             return min_score
 
 
+def read_benchmarks_from_file(file_name: str) -> list[tuple[str, int]]:
+    with open(file_name, "r") as file:
+        lines = file.readlines()
+    benchmarks = [(line.split()[0], int(line.split()[1])) for line in lines]
+    return benchmarks
+
+
 # Main application
 if __name__ == '__main__':
+    play_game = False
+
     board = Board()
     while True:
         try:
@@ -357,36 +424,41 @@ if __name__ == '__main__':
             print("Difficulty should be a number between 1 and 10.")
 
     player2 = MinMaxPlayer(difficulty, 8)
-    # game loop
-    board.print_board()
-    while not board.is_draw():
+    benchmark_filename = "../benchmark/Test_L3_R1"
+    benchmarks = read_benchmarks_from_file(benchmark_filename)
+    player2.run_benchmarks(benchmarks, board)
 
-        if board.current_player == 1:
-            print(f"Current player: {board.current_player}")
-            while True:
-                try:
-                    move = int(input("Enter a move: ")) - 1
-                    assert move in board.get_valid_moves()
-                    break
-                except ValueError:
-                    print("Invalid move. Please Enter a valid number.")
-                except AssertionError:
-                    print("Move is not valid. Choose a move from the list of valid moves.")
-        else:  # Player 2
-            print(f"Current player: {board.current_player}")
-            print("Running full search without pruning...")
-            _ = player2.choose_move(board, pruning=False)
-            print("Running search with iterative deepening...")
-            _ = player2.choose_move(board, pruning=False, iterative=True)
-            print("Running search with pruning...")
-            move = player2.choose_move(board, pruning=True)
-        board.make_move(move)
-        player2.full_search_counter = 0
-        player2.pruned_nodes_count = 0
-
+    if play_game:
+        # game loop
         board.print_board()
-        if board.is_winner(1):
-            print("Player 1 wins!")
-            break
-        elif board.is_winner(2):
-            print("Player 2 wins!")
+        while not board.is_draw():
+
+            if board.current_player == 1:
+                print(f"Current player: {board.current_player}")
+                while True:
+                    try:
+                        move = int(input("Enter a move: ")) - 1
+                        assert move in board.get_valid_moves()
+                        break
+                    except ValueError:
+                        print("Invalid move. Please Enter a valid number.")
+                    except AssertionError:
+                        print("Move is not valid. Choose a move from the list of valid moves.")
+            else:  # Player 2
+                print(f"Current player: {board.current_player}")
+                print("Running full search without pruning...")
+                _ = player2.choose_move(board, pruning=False)
+                print("Running search with iterative deepening...")
+                _ = player2.choose_move(board, pruning=False, iterative=True)
+                print("Running search with pruning...")
+                move = player2.choose_move(board, pruning=True)
+            board.make_move(move)
+            player2.full_search_counter = 0
+            player2.pruned_nodes_count = 0
+
+            board.print_board()
+            if board.is_winner(1):
+                print("Player 1 wins!")
+                break
+            elif board.is_winner(2):
+                print("Player 2 wins!")
